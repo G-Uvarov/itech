@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Calculatrix</title>
+	<meta charset="utf-8">
+	<script type="text/javascript">
+		functions = {};
+		functions["sin"] = function(x){
+			return Math.sin(x);
+		}
+		functions["cos"] = function(x){
+			return Math.cos(x);
+		}
+		operators = {};
+		operators["+"] = function(a, b){
+			return a+b;
+		};
+		operators["-"] = function(a, b){
+			return a-b;
+		};
+		operators["*"] = function(a, b){
+			return a*b;
+		};
+		operators["/"] = function(a, b){
+			return a/b;
+		};
+		operators["^"] = function(a, b){
+			return Math.pow(a,b);
+		};
+		var processing = null;
+
+		function calculatePriority(item, group){
+			if(item == "+" || item == "-")
+				return group*10 + 1;
+			if(item == "*" || item == "/")
+				return group*10 + 2;
+			if(item == "^")
+				return group*10 + 3;
+			return group*10 + 4;
+		}
+
+		function removeEmptyBrackets(items){
+			var dist = 0;
+			for(var i = 0; i < items.length; i++){
+				if(items[i] == '(')
+					dist = 0;
+				else if(items[i] == ')'){
+					if(dist <= 1){
+						items.splice(i-dist-1,1);
+						items.splice(i-1,1);
+					}
+				}else{
+					dist ++;
+				}
+			}
+			return items;
+		}
+
+		function calculateOperator(items, index){
+			var op = items[index];
+			var a = 0;
+			var b = 0;
+			var start = index;
+			var count = 1;
+			if(op in operators){
+				if(index > 0 && typeof items[index-1] == "number"){
+					a = items[index-1];
+					start = index-1;
+					count++;
+				}
+				if(index < items.length-1 && typeof items[index+1] == "number"){
+					b = items[index+1];
+					count++;
+				}
+				var c = operators[op](a,b);
+				items.splice(start, count, c); // удаляет задействованные элементы и вставляет результат
+			}
+			return items;
+		}
+
+		function calculateFunction(items, index){
+			var x = 0;
+			var f = items[index].toLowerCase();
+			var start = index;
+			var count = 1;
+			if(f in functions){
+				if(index < items.length-1 && typeof items[index+1] == "number"){
+					x = items[index+1];
+					count++;
+				}
+				var c = functions[f](x);
+				items.splice(start, count, c); // удаляет задействованные элементы и вставляет результат
+			}
+		}
+
+		function findHighestPriority(items){
+			var found = 0;
+			var highest = -1;
+			var group = 0;
+			for(var i = 0; i < items.length; i++){
+				if(typeof(items[i]) != "number"){
+					if(items[i] == '(')
+						group++;
+					else if(items[i] == ')')
+						group--;
+					else{
+						var p = calculatePriority(items[i], group);
+						if(p > highest){
+							found = i;
+							highest = p;
+						}
+					}
+				}
+			}
+			return found;
+		}
+
+		function tokenize(input){
+			var items = [];
+			var symbols = "";
+			for(var i = 0; i < input.length; i++){
+				if(input[i] == " "){
+					if(symbols.length > 0){
+						items.push(symbols);
+						symbols = "";
+					}
+				}else if(input[i] == "(" || input[i] == ")" || input[i] in operators){
+					if(symbols.length > 0){
+						items.push(symbols);
+						symbols = "";
+					}
+					items.push(input[i]);
+				}else{
+					symbols += input[i];
+				}
+			}
+			if(symbols.length > 0){
+				items.push(symbols);
+				symbols = "";
+			}
+			return items;
+		}
+		
+		function parseNumbers(items){
+			for(var i = 0; i < items.length; i++){
+				var parsed = Number.parseFloat(items[i]);
+				if(!isNaN(parsed))
+					items[i] = parsed;
+			}
+			return items;
+		}
+		function printMessage(block, text){
+			block.innerHTML += `${text}<br>`;
+		}
+		function printOutput(block, items){
+			var str = "";
+			for(var i = 0; i < items.length; i++){
+				str += ` ${items[i]} `;
+			}
+			block.innerHTML += `${str}<br>`;
+		}
+
+		function calculate(){
+			var input = document.getElementById("expression_input");
+			var div = document.getElementById("output_div");
+			div.innerHTML = "";
+			var expression = parseNumbers(tokenize(input.value));
+			processing = expression;
+			while(processing.length > 1){
+				removeEmptyBrackets(processing);
+				printOutput(div, processing);
+				var max = findHighestPriority(processing);
+				if(typeof processing[max] == "number"){
+					break;
+				}
+				if(processing[max] in operators){
+					calculateOperator(processing, max);
+				}else if(processing[max].toLowerCase() in functions){
+					calculateFunction(processing, max);
+				}else{
+					printMessage(div, `Неправильный ввод ${processing[max]}`);
+					break;
+				}
+				removeEmptyBrackets(processing);
+			}
+			printOutput(div, processing);
+			
+		}
+	</script>
+</head>
+<body onkeyup="if(event.keyCode == 13) calculate();">
+	<div style="text-align: center; line-height: 1.25em;">
+		<br>
+		<input type="text" name="expression_input" id="expression_input" inputmode="text" size="40">
+		<button onclick="calculate();">=</button>
+		<div id="output_div"></div>
+	</div>
+</body>
+</html>
